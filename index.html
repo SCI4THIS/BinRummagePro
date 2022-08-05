@@ -1,8 +1,154 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Bin Rummage Pro</title>
+<title>Rummage Bin Pro</title>
+<style>
+td { border:1px solid white; cursor: cell; user-select:all; }
+td:hover { border:1px solid black; }
+td.selected { background-color: blue; }
+td.unselected { background-color: white; }
+#context-menu {
+  position: fixed;
+  z-index: 10000;
+  width: 150px;
+  background: #1b1a1a;
+  display: none;
+}
+#context-menu.visible {
+  display: block;
+}
+#context-menu .item {
+  padding: 8px 10px;
+  font-size: 15px;
+  color: #eee;
+  cursor: pointer;
+  border-radius: inherit;
+}
+#context-menu .item:hover {
+  background: #343434;
+}
+</style>
+<script>
+
+var range_ix_0 = -1;
+var range_ix_1 = -1;
+
+function hide_menu()
+{
+  let menu = document.getElementById("context-menu");
+  menu.classList.remove("visible");
+}
+
+document.onclick = function(e) {
+  hide_menu();
+}
+
+document.oncontextmenu = function(e) {
+	let menu = document.getElementById("context-menu");
+	const { clientX: X, clientY: Y } = e;
+	menu.style.top = `${Y}px`;
+	menu.style.left= `${X}px`;
+	menu.classList.add("visible");
+	let selobj = document.getSelection();
+	range_ix_0 = node_id(selobj.anchorNode);
+	range_ix_1 = node_id(selobj.extentNode);
+	//console.log(e.pageY, e.pageX);
+	return false;
+}
+
+function node_id(node)
+{
+	console.log(node.parentElement.tagName);
+	if (node.parentElement.tagName != 'TR') {
+		return node_id(node.parentNode);
+	}
+	return Number(node.id);
+
+}
+
+function transform(tx_f)
+{
+	let selobj = document.getSelection();
+	let ix_0 = range_ix_0;
+	let ix_1 = range_ix_1;
+	if (ix_1 < ix_0) {
+		let temp = ix_1;
+		ix_1 = ix_0;
+		ix_0 = temp;
+	}
+	for (let ix = ix_0; ix <= ix_1; ix++) {
+		tx_f(document.getElementById(ix.toString()));
+	}
+	hide_menu();
+}
+
+function hex_transform()
+{
+  transform(function(node) { node.innerHTML = Number(node.getAttribute("value")).toString(16).padStart(2, '0'); });
+}
+
+function ascii_transform()
+{
+  transform(function (node) { node.innerHTML = String.fromCharCode(Number(node.getAttribute("value"))); });
+}
+
+function addRow(arr, offset, len)
+{
+	let tbody = document.getElementById('payload');
+	let tr = document.createElement("tr");
+	for (let j = 0; j < len; j++) {
+		let i =  offset + j;
+		let td = document.createElement("td");
+		td.setAttribute("id", i);
+		td.onchange = function() { change(obj); }
+		let num = Number(arr[i]);
+		td.setAttribute("value", Number(arr[i]));
+		//let str = Number(arr[i]).toString(16).padStart(2, '0');
+		//let text = document.createTextNode(str);
+		//td.appendChild(text);
+		tr.appendChild(td);
+	}
+	tbody.appendChild(tr);
+}
+
+function readFile(input) {
+  let file = input.files[0];
+  let fileReader = new FileReader();
+
+  document.getElementById('payload').innerHTML = '';
+
+  fileReader.readAsArrayBuffer(file);
+  fileReader.onload = function() {
+    let arr = new Uint8Array(fileReader.result);
+    for (let i = 0; i < arr.length; i += 16) {
+	    let rem = arr.length - i;
+	    if (rem < 16) {
+		    addRow(arr, i, rem);
+	    } else {
+		    addRow(arr, i, 16);
+	    }
+    }
+    range_ix_0 = 0;
+    range_ix_1 = arr.length - 1;
+    hex_transform();
+  }
+  fileReader.onerror = function() {
+    alert(fileReader.error);
+  }
+}
+</script>
 </head>
 <body>
+<input onchange="readFile(this)" type="file" />
+<div id="context-menu">
+	<div class="item" onclick="hex_transform()">hex</div>
+	<div class="item" onclick="ascii_transform()">ASCII</div>
+</div>
+<table>
+<thead>
+</thead>
+<tbody id="payload">
+</tbody>
+</table>
 </body>
 </html>
